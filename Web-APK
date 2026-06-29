@@ -1,0 +1,132 @@
+
+<!doctype html>
+<!-- 공모전 전용 사이트 프로토타입: 제출작 목록 + 우리 페이지 안에서 앱 실행(Appetize 임베드) -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>앱 공모전 — 제출작 체험</title>
+<style>
+  :root{--line:#e5e7eb;--ink:#111;--sub:#6b7280;--brand:#2563eb}
+  *{box-sizing:border-box} body{margin:0;font-family:system-ui,sans-serif;color:var(--ink)}
+  header{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0}
+  header .sub{color:var(--sub);font-size:13px}
+  .bar{margin-left:auto;display:flex;gap:8px}
+  button{padding:7px 11px;border:1px solid #bbb;background:#fff;border-radius:7px;cursor:pointer;font-size:13px}
+  .wrap{display:flex;gap:0;min-height:calc(100vh - 60px)}
+  .list{width:300px;border-right:1px solid var(--line);overflow:auto}
+  .item{padding:12px 16px;border-bottom:1px solid var(--line);cursor:pointer}
+  .item:hover{background:#f8fafc}
+  .item.active{background:#eef2ff;border-left:3px solid var(--brand);padding-left:13px}
+  .item .name{font-weight:600}
+  .item .meta{font-size:12px;color:var(--sub);margin-top:2px;word-break:break-all}
+  .stage{flex:1;display:flex;align-items:center;justify-content:center;background:#fafafa;padding:16px}
+  .ph{color:var(--sub);text-align:center;max-width:320px;line-height:1.6}
+  iframe{border:0;border-radius:12px;box-shadow:0 6px 30px rgba(0,0,0,.12);background:#fff}
+</style>
+</head>
+<body>
+<header>
+  <h1>앱 공모전 — 제출작 체험</h1>
+  <span class="sub">작품을 고르면 이 페이지에서 바로 실행됩니다 (설치 불필요)</span>
+  <div class="bar">
+    <button id="importBtn">제출작 불러오기(JSON)</button>
+    <input type="file" id="import" accept=".json" style="display:none">
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="list" id="list"></div>
+  <div class="stage" id="stage"></div>
+</div>
+
+<script>
+// 제출작 목록 관리 + 선택 시 우리 페이지 안에 Appetize 임베드로 실행
+const PLACEHOLDER = 'REPLACE_ME';
+const seed = [
+  { name: '예시작품 A', publicKey: PLACEHOLDER },
+  { name: '예시작품 B', publicKey: PLACEHOLDER },
+];
+let data = seed.slice();
+let active = 0;
+
+function buildEmbedUrl(publicKey) {
+  const q = new URLSearchParams({ device: 'pixel4xl', osVersion: '14.0', scale: '75', autoplay: 'true' });
+  return `https://appetize.io/embed/${publicKey}?${q.toString()}`;
+}
+
+function renderList() {
+  const el = document.getElementById('list');
+  el.innerHTML = '';
+  data.forEach((s, i) => {
+    const div = document.createElement('div');
+    div.className = 'item' + (i === active ? ' active' : '');
+    div.innerHTML = `<div class="name">${s.name || '(이름 없음)'}</div>` +
+      `<div class="meta">${s.publicKey === PLACEHOLDER ? 'publicKey 미입력' : s.publicKey}</div>`;
+    div.onclick = () => { active = i; renderList(); renderStage(); };
+    el.appendChild(div);
+  });
+}
+
+function renderStage() {
+  const stage = document.getElementById('stage');
+  const s = data[active];
+  if (!s || s.publicKey === PLACEHOLDER || !s.publicKey) {
+    stage.innerHTML = `<div class="ph">작품을 선택하면 여기서 앱이 실행됩니다.<br><br>
+      지금은 예시라 publicKey가 비어 있어요. <b>제출작 불러오기(JSON)</b>로 실제 작품 목록(bulk-upload 결과)을 넣으면 라이브로 실행됩니다.</div>`;
+    return;
+  }
+  stage.innerHTML = `<iframe src="${buildEmbedUrl(s.publicKey)}" width="378" height="800" scrolling="no" allow="fullscreen"></iframe>`;
+}
+
+document.getElementById('importBtn').onclick = () => document.getElementById('import').click();
+function mapSubmissions(arr) {
+  // bulk-upload의 submissions.json: [{name, publicKey, link}]
+  return arr.map(r => ({ name: r.name || '(이름 없음)', publicKey: r.publicKey || (r.link ? r.link.split('/').pop() : PLACEHOLDER) }));
+}
+
+document.getElementById('import').onchange = async (e) => {
+  const file = e.target.files[0]; if (!file) return;
+  try {
+    const arr = JSON.parse(await file.text());
+    if (!Array.isArray(arr) || !arr.length) throw new Error('형식');
+    data = mapSubmissions(arr);
+    active = 0; renderList(); renderStage();
+  } catch { alert('JSON을 읽지 못했습니다. bulk-upload가 만든 submissions.json을 넣어주세요.'); }
+  e.target.value = '';
+};
+
+// 호스팅되면 같은 폴더의 submissions.json을 자동 로딩(로컬 file://에선 막히므로 위 불러오기 버튼이 백업)
+async function init() {
+  try {
+    const res = await fetch('submissions.json', { cache: 'no-store' });
+    if (res.ok) {
+      const arr = await res.json();
+      if (Array.isArray(arr) && arr.length) data = mapSubmissions(arr);
+    }
+  } catch (e) { /* 로컬에선 무시하고 예시 유지 */ }
+  active = 0; renderList(); renderStage();
+}
+init();
+</script>
+</body>
+</html>
+
+# 앱 공모전 — 제출작 체험 사이트
+
+공모전 제출작(APK)을 방문자가 **브라우저에서 바로 실행**해보는 정적 사이트. 실행은 Appetize 임베드로 처리.
+
+## 구성
+- `index.html` — 사이트 본체(목록 + 임베드 플레이어). 같은 폴더의 `submissions.json`을 자동 로딩.
+- `submissions.json` — 제출작 목록 `[{ "name": "...", "publicKey": "..." }]`. `../contest/bulk-upload`로 생성한 걸 여기에 덮어쓴다.
+- `.nojekyll` — GitHub Pages가 파일을 그대로 서빙하게 하는 표식.
+
+## 배포
+GitHub Pages로 올린다. 순서: `../contest/깃허브-페이지-배포.md`.
+배포 후 그 도메인을 **Appetize 임베드 허용 도메인**에 등록해야 앱이 실행된다.
+
+[
+  { "name": "예시작품 A (실제 작품으로 교체)", "publicKey": "REPLACE_ME" },
+  { "name": "예시작품 B (실제 작품으로 교체)", "publicKey": "REPLACE_ME" }
+]
