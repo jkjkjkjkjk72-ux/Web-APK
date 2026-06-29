@@ -1,0 +1,83 @@
+<!doctype html>
+<!-- 통합 페이지(Cloudflare): 누구나 작품 시연(새 탭 실행) + 비밀번호 아는 주최측만 APK 추가 -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>앱 공모전 — 제출작 체험</title>
+<style>
+  :root{--line:#e5e7eb;--ink:#111;--sub:#6b7280;--brand:#2563eb}
+  *{box-sizing:border-box} body{margin:0;font-family:system-ui,sans-serif;color:var(--ink);max-width:760px;margin:0 auto;padding:0 16px}
+  header{padding:20px 0;border-bottom:1px solid var(--line)} h1{font-size:20px;margin:0 0 4px}
+  .sub{color:var(--sub);font-size:13px}
+  .card{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:10px 0;display:flex;align-items:center;gap:12px}
+  .card .nm{font-weight:700} .spacer{flex:1}
+  .run{display:inline-block;padding:8px 14px;background:var(--brand);color:#fff;border-radius:8px;text-decoration:none;font-weight:700;white-space:nowrap}
+  .admin{margin:24px 0;border:2px dashed #c7d2fe;border-radius:12px;padding:16px}
+  .admin summary{font-weight:700;cursor:pointer}
+  input{padding:9px;font-size:14px;border:1px solid #bbb;border-radius:6px;width:100%;box-sizing:border-box;margin:6px 0}
+  button{padding:9px 14px;font-size:14px;border:0;border-radius:7px;cursor:pointer;background:#111;color:#fff;font-weight:700}
+  button:disabled{background:#9ca3af}
+  .del{background:#fff;color:#b91c1c;border:1px solid #f3c0c0;font-weight:400;padding:5px 9px}
+  .msg{margin-top:8px;font-size:14px} .err{color:#b91c1c} .ok{color:#059669}
+</style>
+</head>
+<body>
+<header>
+  <h1>앱 공모전 — 제출작 체험</h1>
+  <div class="sub">작품의 <b>실행</b>을 누르면 새 탭에서 앱이 열립니다 (설치 불필요).</div>
+</header>
+
+<div id="list"></div>
+
+<details class="admin">
+  <summary>주최측 — 작품 추가 (비밀번호 필요)</summary>
+  <input id="pw" type="password" placeholder="관리자 비밀번호">
+  <input id="name" placeholder="작품 이름 (예: 붕어빵앱)">
+  <input id="apk" type="file" accept=".apk">
+  <button id="add">업로드 + 게시</button>
+  <div id="msg" class="msg"></div>
+</details>
+
+<script>
+const $ = id => document.getElementById(id);
+function playUrl(pk){ return 'https://appetize.io/app/' + pk; }
+
+async function refresh() {
+  const r = await fetch('/api/list'); const d = await r.json();
+  const el = $('list'); el.innerHTML = '';
+  const list = d.list || [];
+  if (!list.length) { el.innerHTML = '<p class="sub">아직 제출작이 없습니다.</p>'; return; }
+  list.forEach((s, i) => {
+    const div = document.createElement('div'); div.className = 'card';
+    div.innerHTML = `<span class="nm">${i + 1}. ${s.name}</span><span class="spacer"></span>`
+      + `<a class="run" href="${playUrl(s.publicKey)}" target="_blank" rel="noopener">▶ 실행</a>`;
+    const del = document.createElement('button'); del.className = 'del'; del.textContent = '삭제';
+    del.onclick = async () => {
+      const password = $('pw').value;
+      if (!password) { alert('삭제하려면 관리자 비밀번호를 위 칸에 먼저 입력하세요.'); return; }
+      if (!confirm(`"${s.name}" 삭제할까요?`)) return;
+      const rr = await fetch('/api/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password, publicKey: s.publicKey }) });
+      if (rr.ok) refresh(); else alert((await rr.json()).error || '삭제 실패');
+    };
+    div.appendChild(del); el.appendChild(div);
+  });
+}
+
+$('add').onclick = async () => {
+  const password = $('pw').value, name = $('name').value.trim(), file = $('apk').files[0];
+  if (!password || !name || !file) { $('msg').className = 'msg err'; $('msg').textContent = '비밀번호·이름·APK를 모두 넣어주세요.'; return; }
+  $('add').disabled = true; $('msg').className = 'msg'; $('msg').textContent = '업로드·게시 중... (수십 초)';
+  try {
+    const fd = new FormData(); fd.append('password', password); fd.append('name', name); fd.append('apk', file);
+    const r = await fetch('/api/add', { method: 'POST', body: fd }); const d = await r.json();
+    if (!r.ok) throw new Error(d.error || '실패');
+    $('msg').className = 'msg ok'; $('msg').textContent = `완료! "${name}" 추가됨.`;
+    $('name').value = ''; $('apk').value = ''; refresh();
+  } catch (e) { $('msg').className = 'msg err'; $('msg').textContent = '오류: ' + e.message; }
+  finally { $('add').disabled = false; }
+};
+refresh();
+</script>
+</body>
+</html>
