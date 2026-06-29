@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 공모전 전용 사이트 프로토타입: 제출작 목록 + 우리 페이지 안에서 앱 실행(Appetize 임베드) -->
+<!-- 공모전 전용 사이트: 제출작 목록 + 클릭 시 새 탭에서 앱 실행(Appetize 링크아웃, 무료 플랜) -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -22,13 +22,13 @@
   .item .meta{font-size:12px;color:var(--sub);margin-top:2px;word-break:break-all}
   .stage{flex:1;display:flex;align-items:center;justify-content:center;background:#fafafa;padding:16px}
   .ph{color:var(--sub);text-align:center;max-width:320px;line-height:1.6}
-  iframe{border:0;border-radius:12px;box-shadow:0 6px 30px rgba(0,0,0,.12);background:#fff}
+  .runbig{display:inline-block;padding:14px 22px;background:var(--brand);color:#fff;border-radius:10px;text-decoration:none;font-size:16px;font-weight:700;box-shadow:0 6px 20px rgba(37,99,235,.3)}
 </style>
 </head>
 <body>
 <header>
   <h1>앱 공모전 — 제출작 체험</h1>
-  <span class="sub">작품을 고르면 이 페이지에서 바로 실행됩니다 (설치 불필요)</span>
+  <span class="sub">작품을 고르면 새 탭에서 실행됩니다 (설치 불필요)</span>
   <div class="bar">
     <button id="importBtn">제출작 불러오기(JSON)</button>
     <input type="file" id="import" accept=".json" style="display:none">
@@ -41,7 +41,7 @@
 </div>
 
 <script>
-// 제출작 목록 관리 + 선택 시 우리 페이지 안에 Appetize 임베드로 실행
+// 제출작 목록 관리 + 선택 시 Appetize 플레이 링크를 새 탭에서 실행(링크아웃)
 const PLACEHOLDER = 'REPLACE_ME';
 const seed = [
   { name: '예시작품 A', publicKey: PLACEHOLDER },
@@ -50,9 +50,8 @@ const seed = [
 let data = seed.slice();
 let active = 0;
 
-function buildEmbedUrl(publicKey) {
-  const q = new URLSearchParams({ device: 'pixel4xl', osVersion: '14.0', scale: '75', autoplay: 'true' });
-  return `https://appetize.io/embed/${publicKey}?${q.toString()}`;
+function buildPlayUrl(publicKey) {
+  return `https://appetize.io/app/${publicKey}`;
 }
 
 function renderList() {
@@ -72,11 +71,15 @@ function renderStage() {
   const stage = document.getElementById('stage');
   const s = data[active];
   if (!s || s.publicKey === PLACEHOLDER || !s.publicKey) {
-    stage.innerHTML = `<div class="ph">작품을 선택하면 여기서 앱이 실행됩니다.<br><br>
-      지금은 예시라 publicKey가 비어 있어요. <b>제출작 불러오기(JSON)</b>로 실제 작품 목록(bulk-upload 결과)을 넣으면 라이브로 실행됩니다.</div>`;
+    stage.innerHTML = `<div class="ph">작품을 선택하면 여기서 실행 버튼이 나옵니다.<br><br>
+      지금은 예시라 publicKey가 비어 있어요. <b>제출작 불러오기(JSON)</b>로 실제 작품 목록(bulk-upload 결과)을 넣으면 실행됩니다.</div>`;
     return;
   }
-  stage.innerHTML = `<iframe src="${buildEmbedUrl(s.publicKey)}" width="378" height="800" scrolling="no" allow="fullscreen"></iframe>`;
+  stage.innerHTML = `<div class="ph">
+      <div style="font-size:18px;font-weight:700;color:var(--ink);margin-bottom:16px">${s.name}</div>
+      <a class="runbig" href="${buildPlayUrl(s.publicKey)}" target="_blank" rel="noopener">▶ 브라우저에서 실행 (새 탭)</a>
+      <div style="margin-top:14px;font-size:12px">새 탭에서 Appetize로 앱이 열립니다. 설치 불필요.</div>
+    </div>`;
 }
 
 document.getElementById('importBtn').onclick = () => document.getElementById('import').click();
